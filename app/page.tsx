@@ -6,7 +6,7 @@ export default function Home() {
       <section className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <header className="space-y-3">
           <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
-            You did it! You are a genius!
+            Yes! It is working!
           </p>
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">

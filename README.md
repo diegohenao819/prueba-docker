@@ -45,3 +45,13 @@ To publish it on another host port:
 ```bash
 APP_PORT=3001 docker compose up --build -d
 ```
+
+## GitHub Actions Deployment
+
+Create these repository secrets in GitHub:
+
+- `VPS_HOST`: VPS IP address or domain.
+- `VPS_USER`: SSH user.
+- `VPS_SSH_KEY`: private SSH key with access to the VPS.
+
+The VPS must have this repository cloned at `/home/diego/mi-app`, Docker installed, and the SSH user must be able to run `docker compose`.

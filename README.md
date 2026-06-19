@@ -1,6 +1,7 @@
 # To-do App
 
-A simple task list built with Next.js.
+A task list built with Next.js and PostgreSQL. Tasks remain available after
+page reloads and container restarts.
 
 ## Scripts
 
@@ -10,27 +11,27 @@ npm run lint
 npm run build
 ```
 
+For local development, copy `.env.example` to `.env`, change the
+password if needed, and start PostgreSQL before Next.js:
+
+```bash
+docker compose up -d db
+npm run dev
+```
+
 Open `http://localhost:3000` after starting the development server.
 
 ## Docker
 
-```bash
-docker build -t prueba-docker .
-docker run --rm -p 3000:3000 prueba-docker
-```
-
-If port `3000` is already in use, run:
-
-```bash
-docker run --rm -p 3001:3000 prueba-docker
-```
+The application requires PostgreSQL, so Docker Compose is the recommended way
+to run the production image.
 
 ## Docker Compose
 
 ```bash
 docker compose up --build -d
 docker compose ps
-docker compose logs -f app
+docker compose logs -f app db
 ```
 
 To update the app on a VPS after pulling the latest code:
@@ -45,6 +46,11 @@ To publish it on another host port:
 ```bash
 APP_PORT=3001 docker compose up --build -d
 ```
+
+PostgreSQL stores its files in the named `postgres_data` volume. The schema in
+`db/init.sql` is applied automatically the first time that volume is created.
+Set `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in a `.env` file for
+deployment; the values in `.env.example` are development examples.
 
 ## GitHub Actions Deployment
 

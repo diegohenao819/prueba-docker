@@ -1,25 +1,22 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import type { FormEvent } from "react";
+import {
+  clearCompletedAction,
+  createTodoAction,
+  removeTodoAction,
+  toggleTodoAction,
+} from "./actions";
+import type { Todo } from "@/lib/types";
 
 type Filter = "all" | "active" | "completed";
-
-type Todo = {
-  id: string;
-  text: string;
-  completed: boolean;
-};
 
 const filters: Array<{ id: Filter; label: string }> = [
   { id: "all", label: "All" },
   { id: "active", label: "Active" },
   { id: "completed", label: "Completed" },
 ];
-
-function createTodoId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
 
 function getEmptyMessage(filter: Filter) {
   if (filter === "active") {
@@ -33,10 +30,12 @@ function getEmptyMessage(filter: Filter) {
   return "Your list is empty. Add the first task to get started.";
 }
 
-export default function TodoApp() {
-  const [todos, setTodos] = useState<Todo[]>([]);
+export default function TodoApp({ initialTodos }: { initialTodos: Todo[] }) {
+  const [todos, setTodos] = useState<Todo[]>(initialTodos);
   const [newTask, setNewTask] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [error, setError] = useState("");
+  const [isPending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const activeCount = todos.filter((todo) => !todo.completed).length;
@@ -62,34 +61,97 @@ export default function TodoApp() {
       return;
     }
 
-    setTodos((currentTodos) => [
-      ...currentTodos,
-      { id: createTodoId(), text, completed: false },
-    ]);
-    setNewTask("");
-    inputRef.current?.focus();
+    startTransition(async () => {
+      setError("");
+
+      try {
+        const result = await createTodoAction(text);
+
+        if (!result.ok) {
+          setError(result.error);
+          inputRef.current?.focus();
+          return;
+        }
+
+        setTodos((currentTodos) => [...currentTodos, result.data]);
+        setNewTask("");
+        inputRef.current?.focus();
+      } catch {
+        setError("The change could not be saved. Please try again.");
+      }
+    });
   }
 
-  function toggleTodo(id: string) {
-    setTodos((currentTodos) =>
-      currentTodos.map((todo) =>
-        todo.id === id ? { ...todo, completed: !todo.completed } : todo,
-      ),
-    );
+  function toggleTodo(id: string, completed: boolean) {
+    startTransition(async () => {
+      setError("");
+
+      try {
+        const result = await toggleTodoAction(id, completed);
+
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+
+        setTodos((currentTodos) =>
+          currentTodos.map((todo) =>
+            todo.id === result.data.id ? result.data : todo,
+          ),
+        );
+      } catch {
+        setError("The change could not be saved. Please try again.");
+      }
+    });
   }
 
   function removeTodo(id: string) {
-    setTodos((currentTodos) =>
-      currentTodos.filter((todo) => todo.id !== id),
-    );
+    startTransition(async () => {
+      setError("");
+
+      try {
+        const result = await removeTodoAction(id);
+
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+
+        setTodos((currentTodos) =>
+          currentTodos.filter((todo) => todo.id !== result.data),
+        );
+      } catch {
+        setError("The change could not be saved. Please try again.");
+      }
+    });
   }
 
   function clearCompleted() {
-    setTodos((currentTodos) => currentTodos.filter((todo) => !todo.completed));
+    startTransition(async () => {
+      setError("");
+
+      try {
+        const result = await clearCompletedAction();
+
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+
+        setTodos((currentTodos) =>
+          currentTodos.filter((todo) => !todo.completed),
+        );
+      } catch {
+        setError("The change could not be saved. Please try again.");
+      }
+    });
   }
 
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
+    <section
+      aria-busy={isPending}
+      className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm sm:p-6"
+    >
       <form className="flex flex-col gap-3 sm:flex-row" onSubmit={handleSubmit}>
         <div className="flex-1">
           <label
@@ -114,12 +176,25 @@ export default function TodoApp() {
           />
         </div>
         <button
-          className="min-h-12 rounded-md bg-emerald-700 px-5 text-base font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 sm:self-end"
+          className="min-h-12 rounded-md bg-emerald-700 px-5 text-base font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:cursor-wait disabled:opacity-60 sm:self-end"
+          disabled={isPending}
           type="submit"
         >
           Add task
         </button>
       </form>
+
+      <div className="mt-3 min-h-5" aria-live="polite">
+        {error ? (
+          <p className="text-sm font-medium text-red-700" role="alert">
+            {error}
+          </p>
+        ) : isPending ? (
+          <p className="text-sm text-zinc-600" role="status">
+            Saving changes…
+          </p>
+        ) : null}
+      </div>
 
       <div className="mt-6 flex flex-col gap-4 border-t border-zinc-200 pt-5 sm:flex-row sm:items-end sm:justify-between">
         <fieldset>
@@ -154,6 +229,7 @@ export default function TodoApp() {
           {completedCount > 0 ? (
             <button
               className="min-h-11 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              disabled={isPending}
               onClick={clearCompleted}
               type="button"
             >
@@ -178,7 +254,8 @@ export default function TodoApp() {
                     className="mt-1 size-5 rounded border-zinc-300 accent-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                     id={`todo-${todo.id}`}
                     name={`todo-${todo.id}`}
-                    onChange={() => toggleTodo(todo.id)}
+                    disabled={isPending}
+                    onChange={() => toggleTodo(todo.id, !todo.completed)}
                     type="checkbox"
                   />
                   <span
@@ -193,6 +270,7 @@ export default function TodoApp() {
                 </label>
                 <button
                   className="min-h-11 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 sm:self-auto"
+                  disabled={isPending}
                   onClick={() => removeTodo(todo.id)}
                   type="button"
                 >

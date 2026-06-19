@@ -1,6 +1,11 @@
 import TodoApp from "./todo-app";
+import { getTodos } from "@/lib/todos";
+import { connection } from "next/server";
 
-export default function Home() {
+export default async function Home() {
+  await connection();
+  const todos = await getTodos();
+
   return (
     <main className="min-h-screen bg-zinc-100 px-4 py-8 text-zinc-950 sm:px-6 lg:py-12">
       <section className="mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -19,7 +24,7 @@ export default function Home() {
           </div>
         </header>
 
-        <TodoApp />
+        <TodoApp initialTodos={todos} />
       </section>
     </main>
   );
